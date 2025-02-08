@@ -1,0 +1,135 @@
+---
+title: "Final Project"
+author: "Jake Summaria"
+date: "5/7/2024"
+output: pdf_document
+---
+
+```{r upload}
+library(ggplot2)
+library(MASS)
+library(faraway)
+nba = read.csv("NBA.csv", header = TRUE, sep = ",")
+```
+
+```{r part 1: Model Exploration}
+model = lm(usg_pct ~ pts + ast + ts_pct + ast_pct + net_rating + conference, nba)
+summary(model)
+```
+***
+a: For every 1 point increase in pts, I would estimate the average usg_pct to increase by 0.008, holding all other variables constant. 
+b: For a player in the Eastern Conference, I would estimate the average usg_pct to be 0.0017 lower than a player in the Western Conference, holding all other variables constant.
+c: The conference variable has a p-value of 0.56, which is greater than the usual significance level of 0.05, which means that the conference variable is not statistically significant.
+d: The baseline level is when Conference = 0, which represents the Western Conference.
+***
+
+```{r part 1}
+boxcox(model)
+nba$new_usg_pct = sqrt(nba$usg_pct)
+sqrt_model = lm(new_usg_pct ~ pts + ast + ts_pct + ast_pct + net_rating + conference, nba)
+```
+***
+The Box-Cox suggests a square root transformation as lambda is roughly equal to 0.5. I will use this transformation for the remainder of my analysis to get a more normalized distribution and to stabilize variance.
+***
+
+```{r part 1: New Model}
+model2 = lm(new_usg_pct ~ pts + ast + ts_pct + ast_pct + poly(net_rating, 2) + conference, nba)
+summary(model2)
+```
+***
+I created a polynomial term for the net_rating variable, and based on the summary, the polynomial terms are statistically significant, which means the polynomial transformation contributes to variation in the new_usg_pct variable.
+***
+
+```{r part 1: Model Selection}
+model3 = step(model2, direction = 'backward')
+```
+***
+For the model selection process, I chose to use a backward selection with AIC metric. The resulting model is new_usg_pct ~ pts + ast + ts_pct + ast_pct + poly(net_rating, 2)
+***
+
+```{r part 1: Model Comparison}
+summary(model2)$r.squared
+summary(sqrt_model)$r.squared
+```
+***
+The R^2 of the model with the polynomial term is 0.712, which means that 71.2% of the variance in new_usg_pct is explained by the predictor variables, and the R^2 of the sqrt model is 0.638, which means that 63.8% of the variance in new_usg_pct is explained by the predictor variables.
+***
+
+```{r part 2a}
+```
+***
+a: I have decided to go with the model that was selected from the model selection process because it only includes variables that are significant in the variance of usg_pct.
+***
+
+```{r part 2b}
+summary(model3)$coef
+```
+***
+b: fitted model: new_usg_pct^ = 0.3484 + 0.0097 x pts - 0.0253 x ast - 0.0591 x ts_pct + 0.4859 x ast_pct + 0.1597 x net_rating + 0.4078 x (net_rating)^2
+***
+
+```{r part 2c}
+dim(nba)[1]
+```
+***
+c: n = 533, p = 7
+***
+
+```{r part 2d}
+sd(nba$new_usg_pct)
+sd(residuals(model3))
+```
+***
+d: standard deviation of new_usg_pct = 0.0644
+   standard deviation of model3 = 0.0346
+Because the estimated standard deviation of the model is much lower than the standard deviation of new_usg_pct, it suggests that the model is providing a good fit to the data and that the predictors that are included are useful and significant.
+***
+
+```{r part 2e}
+vif(model3)
+```
+***
+e: Based on the results, the only variable that raises some concern over collinearity is the ast variable, because it's VIF value 6.693 > 5, which is a problem.
+***
+
+```{r part 2f}
+plot(model3)
+```
+***
+f: The Residuals vs Fitted model has a red line that is not very flat, which means that there might not be a linear relationship between the new_usg_pct variable and all of the predictor variables. Also, this shows that the spread of residuals narrows as the fitted values increase, which suggests heteroscedasiticity, violating the assumption of equal variance.
+The QQ plot shows that the residuals follow the predicted line well, which suggests that the residuals follow a normal distribution.
+The scale location plot shows that the spread of residuals closely resembles a funnel, which means that the variability of the residuals is not constant.
+The residuals vs leverage plot has a line that is not flat, which also indicates that the linear assumption is not met. 
+***
+
+```{r part 2g}
+```
+***
+g: unusual observations: based on the scale-location plot, there are three observations that stand out, labeled as 181, 130, and 98. Because a couple of them have a Cook's Distance of about 0.5, I would fit a new model that would exclude these observations due to them having a high influence.
+***
+
+```{r part 2h}
+sqrt(mean((resid(model3) / (1 - hatvalues(model3))) ^ 2))
+```
+***
+h: estimated errors: 0.0358
+This means that the model's predictions have an average error of about 0.03586 units, and because it is a small value, it suggets that the model is making reasonably accurate predictions.
+***
+
+```{r part 2i}
+```
+***
+i: model complexity: n / p = 533 / 7 > 10
+Using the rule of thumb of having at least 10 observations for every coefficient, there is no concern for the model complexity. 
+***
+
+```{r part 3: Statistical Test}
+summary(model3)
+```
+***
+Null Hypothesis: There is no significant relationship between the new_usg_pct variable and the pts variable.
+Alternative Hypothesis: There is a significant relationship between the new_usg_pct variable and the pts variable.
+test statistic = 26.999
+p-value = < 2e-16
+Based on the p-value being less than the threshold of 0.05, I would reject the null hypothesis and conclude that there is a significant relationship between the new_usg_pct variable and the pts variable.
+***
